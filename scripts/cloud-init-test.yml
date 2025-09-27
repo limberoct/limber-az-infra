@@ -1,0 +1,94 @@
+#cloud-config
+
+# Simple test to verify cloud-init is working
+runcmd:
+  # Create a test file to prove cloud-init ran
+  - echo "Cloud-init executed successfully at $(date)" > /home/ubuntu/cloud-init-test.txt
+  - chown ubuntu:ubuntu /home/ubuntu/cloud-init-test.txt
+  
+  # Install a simple web server to test connectivity
+  - apt-get update
+  - apt-get install -y nginx
+  - systemctl enable nginx
+  - systemctl start nginx
+  
+  # Create a simple test page
+  - |
+    cat > /var/www/html/index.html << 'EOF'
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Cloud-Init Test Page</title>
+        <style>
+            body { 
+                font-family: Arial, sans-serif; 
+                text-align: center; 
+                margin-top: 50px; 
+                background: #f0f8ff;
+            }
+            .container { 
+                max-width: 600px; 
+                margin: 0 auto; 
+                padding: 40px; 
+                background: white; 
+                border-radius: 10px; 
+                box-shadow: 0 4px 8px rgba(0,0,0,0.1); 
+            }
+            h1 { color: #2e8b57; }
+            p { color: #333; margin: 10px 0; }
+            .timestamp { 
+                background: #e6f3ff; 
+                padding: 10px; 
+                border-radius: 5px; 
+                margin: 20px 0; 
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>✅ Cloud-Init Test Successful!</h1>
+            <p>This page confirms that cloud-init is working properly.</p>
+            <div class="timestamp">
+                <strong>Server started at:</strong> $(date)
+            </div>
+            <p><strong>Server:</strong> Nginx</p>
+            <p><strong>OS:</strong> Ubuntu 24.04</p>
+            <p><strong>Cloud:</strong> Microsoft Azure</p>
+        </div>
+    </body>
+    </html>
+    EOF
+  
+  # Log completion
+  - echo "Cloud-init test setup completed at $(date)" >> /var/log/cloud-init-test.log
+
+write_files:
+  - path: /home/ubuntu/cloud-init-info.txt
+    content: |
+      Cloud-Init Test Information
+      ==========================
+      
+      This file was created by cloud-init to verify it's working.
+      
+      Test files created:
+      - /home/ubuntu/cloud-init-test.txt (execution timestamp)
+      - /home/ubuntu/cloud-init-info.txt (this file)
+      - /var/www/html/index.html (nginx test page)
+      
+      Services started:
+      - nginx (web server on port 80)
+      
+      To verify:
+      1. SSH: Check files exist
+      2. Web: Visit http://VM_PUBLIC_IP
+      3. Logs: Check /var/log/cloud-init-output.log
+    owner: ubuntu:ubuntu
+    permissions: '0644'
+
+final_message: |
+  Cloud-init test completed successfully!
+  
+  Verification steps:
+  1. SSH into VM and check: ls -la /home/ubuntu/cloud-init-*.txt
+  2. Visit: http://VM_PUBLIC_IP (should show test page)
+  3. Check logs: sudo cat /var/log/cloud-init-output.log

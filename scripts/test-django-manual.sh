@@ -1,0 +1,288 @@
+#!/bin/bash
+# Manual test script for Django cloud-init commands
+# Run this on your VM to test each step individually
+
+set -e
+echo "=== Testing Django Cloud-Init Commands Manually ==="
+
+# Step 1: Stop nginx to free port 80
+echo "Step 1: Stopping nginx..."
+sudo systemctl stop nginx
+sudo systemctl disable nginx
+
+# Step 2: Create test log (like cloud-init does)
+echo "Step 2: Creating initial log..."
+echo "Django cloud-init started at $(date)" > /home/ubuntu/django-init.log
+echo "✅ Log created"
+
+# Step 3: Check if Docker is already installed
+echo "Step 3: Checking Docker installation..."
+if command -v docker &> /dev/null; then
+    echo "✅ Docker already installed: $(docker --version)"
+else
+    echo "Installing Docker..."
+    # Docker installation commands from cloud-init.yml
+    sudo apt-get update
+    sudo apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+    sudo apt-get update
+    sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    sudo usermod -aG docker ubuntu
+    sudo systemctl enable docker
+    sudo systemctl start docker
+    echo "✅ Docker installed"
+fi
+
+# Step 4: Create Django app directory
+echo "Step 4: Creating Django app directory..."
+sudo rm -rf /home/ubuntu/django-app  # Remove if exists
+mkdir -p /home/ubuntu/django-app
+echo "✅ Directory created"
+
+# Step 5: Create requirements.txt
+echo "Step 5: Creating requirements.txt..."
+cat > /home/ubuntu/django-app/requirements.txt << 'EOF'
+Django==4.2.7
+gunicorn==21.2.0
+EOF
+echo "✅ Requirements.txt created"
+
+# Step 6: Create Dockerfile
+echo "Step 6: Creating Dockerfile..."
+cat > /home/ubuntu/django-app/Dockerfile << 'EOF'
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Create Django project
+RUN django-admin startproject helloworld .
+
+# Copy custom settings
+COPY settings.py helloworld/settings.py
+COPY urls.py helloworld/urls.py
+COPY views.py helloworld/views.py
+
+# Collect static files
+RUN python manage.py collectstatic --noinput
+
+EXPOSE 8000
+
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "helloworld.wsgi:application"]
+EOF
+echo "✅ Dockerfile created"
+
+# Step 7: Create Django configuration files
+echo "Step 7: Creating Django files..."
+
+# Create settings.py (simplified from cloud-init.yml)
+cat > /home/ubuntu/django-app/settings.py << 'EOF'
+from pathlib import Path
+import os
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+SECRET_KEY = 'django-insecure-demo-key-change-in-production'
+DEBUG = True
+ALLOWED_HOSTS = ['*']
+
+INSTALLED_APPS = [
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
+]
+
+MIDDLEWARE = [
+    'django.middleware.security.SecurityMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+]
+
+ROOT_URLCONF = 'helloworld.urls'
+
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [],
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                'django.template.context_processors.debug',
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
+            ],
+        },
+    },
+]
+
+WSGI_APPLICATION = 'helloworld.wsgi.application'
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+    }
+}
+
+LANGUAGE_CODE = 'en-us'
+TIME_ZONE = 'UTC'
+USE_I18N = True
+USE_TZ = True
+
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+EOF
+
+# Create urls.py
+cat > /home/ubuntu/django-app/urls.py << 'EOF'
+from django.contrib import admin
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('', views.hello_world, name='hello_world'),
+]
+EOF
+
+# Create views.py
+cat > /home/ubuntu/django-app/views.py << 'EOF'
+from django.http import HttpResponse
+import datetime
+
+def hello_world(request):
+    html = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Hello World Django App</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                margin: 0; padding: 0; display: flex;
+                justify-content: center; align-items: center;
+                min-height: 100vh;
+            }
+            .container {
+                background: white; padding: 40px;
+                border-radius: 10px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+                text-align: center; max-width: 500px;
+            }
+            h1 { color: #333; font-size: 2.5em; margin-bottom: 20px; }
+            p { color: #666; font-size: 1.2em; margin: 10px 0; }
+            .info { background: #f8f9fa; padding: 20px; border-radius: 5px; margin-top: 20px; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🎉 Hello World! 🎉</h1>
+            <p>Welcome to your Django app running on Docker in Azure!</p>
+            <div class="info">
+                <p><strong>Server Time:</strong> {}</p>
+                <p><strong>Status:</strong> Running successfully</p>
+                <p><strong>Framework:</strong> Django + Docker</p>
+                <p><strong>Cloud:</strong> Microsoft Azure</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """.format(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC"))
+    
+    return HttpResponse(html)
+EOF
+
+# Create docker-compose.yml
+cat > /home/ubuntu/django-app/docker-compose.yml << 'EOF'
+version: '3.8'
+services:
+  web:
+    build: .
+    ports:
+      - "80:8000"
+    restart: unless-stopped
+    environment:
+      - DJANGO_SETTINGS_MODULE=helloworld.settings
+EOF
+
+echo "✅ All Django files created"
+
+# Step 8: Build Docker image
+echo "Step 8: Building Django Docker image..."
+cd /home/ubuntu/django-app
+echo "Building Django app at $(date)" >> /home/ubuntu/django-init.log
+
+# Note: Need to logout/login or use newgrp for docker group to take effect
+# For testing, we'll use sudo
+sudo docker compose build
+echo "✅ Docker image built"
+
+# Step 9: Start Django app
+echo "Step 9: Starting Django app..."
+echo "Starting Django app at $(date)" >> /home/ubuntu/django-init.log
+sudo docker compose up -d
+echo "✅ Django app started"
+
+# Step 10: Create management script
+echo "Step 10: Creating management script..."
+cat > /home/ubuntu/manage-app.sh << 'EOF'
+#!/bin/bash
+cd /home/ubuntu/django-app
+case "$1" in
+    start) docker compose up -d; echo "Django app started" ;;
+    stop) docker compose down; echo "Django app stopped" ;;
+    restart) docker compose down && docker compose up -d; echo "Django app restarted" ;;
+    logs) docker compose logs -f ;;
+    status) docker compose ps ;;
+    *) echo "Usage: $0 {start|stop|restart|logs|status}"; exit 1 ;;
+esac
+EOF
+chmod +x /home/ubuntu/manage-app.sh
+echo "✅ Management script created"
+
+# Step 11: Final verification
+echo "Step 11: Final verification..."
+echo "Django app setup completed successfully at $(date)" >> /home/ubuntu/django-init.log
+
+# Wait a moment for containers to start
+sleep 5
+
+# Test local connection
+echo "Testing local connection..."
+curl -I http://localhost || echo "App might still be starting..."
+
+# Show status
+echo ""
+echo "=== Final Status ==="
+echo "Docker containers:"
+cd /home/ubuntu/django-app
+sudo docker compose ps
+
+echo ""
+echo "Management script test:"
+cd /home/ubuntu
+./manage-app.sh status
+
+echo ""
+echo "✅ Manual testing completed!"
+echo "Visit http://$(curl -s ifconfig.me) to see your Django app"
+echo "Check logs with: cat /home/ubuntu/django-init.log"

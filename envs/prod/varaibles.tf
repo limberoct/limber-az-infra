@@ -82,7 +82,7 @@ variable "enable_public_ip" {
 }
 variable "vm_size" { 
   type    = string 
-  default = "Standard_B2ats_v2" 
+  default = "Standard_B1s" 
 }
 variable "os_disk_type" { 
   type    = string 

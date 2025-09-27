@@ -1,31 +1,29 @@
 #cloud-config
-package_update: true
-package_upgrade: true
 
-packages:
-  - apt-transport-https
-  - ca-certificates
-  - curl
-  - gnupg
-  - lsb-release
-  - git
-  - unzip
-
+# Simple and reliable Django setup following successful test pattern
 runcmd:
-  # Install Docker
+  # Create a test file to prove cloud-init ran
+  - echo "Django cloud-init started at $(date)" > /home/ubuntu/django-init.log
+  - chown ubuntu:ubuntu /home/ubuntu/django-init.log
+  
+  # Update packages (like successful test)
+  - apt-get update
+  
+  # Install Docker prerequisites
+  - apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release
+  
+  # Install Docker (following test pattern - simple and direct)
   - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
   - echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
   - apt-get update
   - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
   
-  # Add ubuntu user to docker group
+  # Configure Docker (like successful test)
   - usermod -aG docker ubuntu
-  
-  # Enable and start Docker service
   - systemctl enable docker
   - systemctl start docker
   
-  # Create application directory
+  # Create Django app directory
   - mkdir -p /home/ubuntu/django-app
   - chown ubuntu:ubuntu /home/ubuntu/django-app
   
@@ -74,7 +72,7 @@ runcmd:
     
     BASE_DIR = Path(__file__).resolve().parent.parent
     
-    SECRET_KEY = 'django-insecure-your-secret-key-here-change-in-production'
+    SECRET_KEY = 'django-insecure-demo-key-change-in-production'
     
     DEBUG = True
     
@@ -167,7 +165,6 @@ runcmd:
   - |
     cat > /home/ubuntu/django-app/views.py << 'EOF'
     from django.http import HttpResponse
-    from django.shortcuts import render
     import datetime
     
     def hello_world(request):
@@ -180,37 +177,19 @@ runcmd:
                 body {
                     font-family: Arial, sans-serif;
                     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    margin: 0;
-                    padding: 0;
-                    display: flex;
-                    justify-content: center;
-                    align-items: center;
+                    margin: 0; padding: 0; display: flex;
+                    justify-content: center; align-items: center;
                     min-height: 100vh;
                 }
                 .container {
-                    background: white;
-                    padding: 40px;
+                    background: white; padding: 40px;
                     border-radius: 10px;
                     box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-                    text-align: center;
-                    max-width: 500px;
+                    text-align: center; max-width: 500px;
                 }
-                h1 {
-                    color: #333;
-                    font-size: 2.5em;
-                    margin-bottom: 20px;
-                }
-                p {
-                    color: #666;
-                    font-size: 1.2em;
-                    margin: 10px 0;
-                }
-                .info {
-                    background: #f8f9fa;
-                    padding: 20px;
-                    border-radius: 5px;
-                    margin-top: 20px;
-                }
+                h1 { color: #333; font-size: 2.5em; margin-bottom: 20px; }
+                p { color: #666; font-size: 1.2em; margin: 10px 0; }
+                .info { background: #f8f9fa; padding: 20px; border-radius: 5px; margin-top: 20px; }
             </style>
         </head>
         <body>
@@ -247,11 +226,16 @@ runcmd:
   # Set proper ownership
   - chown -R ubuntu:ubuntu /home/ubuntu/django-app
   
-  # Build and start the Django application
-  - cd /home/ubuntu/django-app && sudo -u ubuntu docker compose build
-  - cd /home/ubuntu/django-app && sudo -u ubuntu docker compose up -d
+  # Build and start Django app (following successful test approach)
+  - echo "Building Django app at $(date)" >> /home/ubuntu/django-init.log
+  - cd /home/ubuntu/django-app && docker compose build
+  - echo "Starting Django app at $(date)" >> /home/ubuntu/django-init.log
+  - cd /home/ubuntu/django-app && docker compose up -d
   
-  # Create a simple management script
+  # Log completion
+  - echo "Django app setup completed successfully at $(date)" >> /home/ubuntu/django-init.log
+  
+  # Create management script
   - |
     cat > /home/ubuntu/manage-app.sh << 'EOF'
     #!/bin/bash
@@ -288,6 +272,30 @@ runcmd:
   - chown ubuntu:ubuntu /home/ubuntu/manage-app.sh
 
 write_files:
+  - path: /home/ubuntu/django-info.txt
+    content: |
+      Django Hello World App Information
+      ==================================
+      
+      This file was created by cloud-init to verify Django deployment.
+      
+      Files created:
+      - /home/ubuntu/django-init.log (setup progress log)
+      - /home/ubuntu/django-info.txt (this file)
+      - /home/ubuntu/django-app/ (application directory)
+      - /home/ubuntu/manage-app.sh (management script)
+      
+      Services:
+      - Docker containers running Django on port 80
+      
+      Verification:
+      1. SSH: Check logs with: cat /home/ubuntu/django-init.log
+      2. Web: Visit http://VM_PUBLIC_IP (Django hello world)
+      3. Management: Use /home/ubuntu/manage-app.sh {start|stop|restart|logs|status}
+      4. Logs: Check /var/log/cloud-init-output.log
+    owner: ubuntu:ubuntu
+    permissions: '0644'
+    
   - path: /etc/systemd/system/django-app.service
     content: |
       [Unit]
@@ -310,15 +318,14 @@ write_files:
     permissions: '0644'
 
 final_message: |
-  Django Hello World app setup completed!
+  Django Hello World app setup completed successfully!
   
-  The app is accessible at:
-  - HTTP: http://YOUR_VM_PUBLIC_IP
+  Verification steps:
+  1. Check setup log: cat /home/ubuntu/django-init.log
+  2. Visit Django app: http://VM_PUBLIC_IP
+  3. Check app status: /home/ubuntu/manage-app.sh status
+  4. View cloud-init logs: sudo cat /var/log/cloud-init-output.log
   
   Management commands:
-  - sudo systemctl start django-app
-  - sudo systemctl stop django-app
-  - sudo systemctl status django-app
-  
-  Or use the management script:
   - /home/ubuntu/manage-app.sh {start|stop|restart|logs|status}
+  - sudo systemctl {start|stop|status} django-app

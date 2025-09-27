@@ -16,7 +16,7 @@ subnets = {
 #VM Configuration
 vm_subnet_name = "public"
 enable_public_ip      = true
-vm_size               = "Standard_B1ls"
+vm_size               = "Standard_B1s"
 os_disk_type          = "Standard_LRS"
 os_disk_size_gb       = 30
 admin_username        = "ubuntu"
