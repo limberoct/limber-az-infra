@@ -13,8 +13,6 @@ module "vnet" {
   tags                = var.tags
 
   subnets = var.subnets
-
-  # Minimal secure NSG: SSH allowed from your IP only (override in tfvars)
   nsg_rules = var.nsg_rules
 }
 
@@ -36,6 +34,7 @@ module "vm" {
   admin_ssh_public_key = var.admin_ssh_public_key
   image                = var.image
   priority             = var.vm_priority
+  custom_data          = var.enable_django_app ? base64encode(file("${path.module}/../../scripts/cloud-init.yml")) : null
 }
 
 output "vm_private_ip" { value = module.vm.private_ip }

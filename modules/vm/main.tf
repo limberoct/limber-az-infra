@@ -63,4 +63,7 @@ resource "azurerm_linux_virtual_machine" "vm" {
   provision_vm_agent              = true
   priority                        = var.priority
   eviction_policy                 = var.priority == "Spot" ? "Delete" : null
+  
+  # Cloud-init script for Django app setup
+  custom_data = var.custom_data
 }

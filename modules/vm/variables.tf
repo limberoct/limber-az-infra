@@ -17,7 +17,7 @@ variable "enable_public_ip" {
 }
 variable "size" { 
   type    = string 
-  default = "Standard_B1s" 
+  default = "Standard_B2ats_v2" 
 }
 variable "os_disk_type" { 
   type    = string 
@@ -42,7 +42,7 @@ variable "image" {
   default = {
     publisher = "Canonical"
     offer     = "ubuntu-24_04-lts"
-    sku       = "server-gen2"
+    sku       = "server"
     version   = "latest"
   }
 }
@@ -51,4 +51,10 @@ variable "priority" {
   description = "Regular or Spot"
   type        = string
   default     = "Regular"
+}
+
+variable "custom_data" {
+  description = "Base64-encoded cloud-init data for VM provisioning"
+  type        = string
+  default     = null
 }

@@ -46,6 +46,28 @@ variable "nsg_rules" {
       destination_port_range     = "22"
       source_address_prefix      = "103.224.52.1/32"
       destination_address_prefix = "*"
+    },
+    {
+      name                       = "allow-http"
+      priority                   = 1010
+      direction                  = "Inbound"
+      access                     = "Allow"
+      protocol                   = "Tcp"
+      source_port_range          = "*"
+      destination_port_range     = "80"
+      source_address_prefix      = "*"
+      destination_address_prefix = "*"
+    },
+    {
+      name                       = "allow-https"
+      priority                   = 1020
+      direction                  = "Inbound"
+      access                     = "Allow"
+      protocol                   = "Tcp"
+      source_port_range          = "*"
+      destination_port_range     = "443"
+      source_address_prefix      = "*"
+      destination_address_prefix = "*"
     }
   ]
 }
@@ -60,7 +82,7 @@ variable "enable_public_ip" {
 }
 variable "vm_size" { 
   type    = string 
-  default = "Standard_B1ls" 
+  default = "Standard_B2ats_v2" 
 }
 variable "os_disk_type" { 
   type    = string 
@@ -85,7 +107,7 @@ variable "image" {
   default = {
     publisher = "Canonical"
     offer     = "ubuntu-24_04-lts"
-    sku       = "server-gen2" 
+    sku       = "server" 
     version   = "latest"
   }
 }
@@ -94,3 +116,9 @@ variable "vm_priority" {
   type    = string 
   default = "Regular" 
 } # or "Spot"
+
+variable "enable_django_app" {
+  description = "Enable Django app deployment via cloud-init"
+  type        = bool
+  default     = true
+}
